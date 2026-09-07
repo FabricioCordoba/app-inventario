@@ -1,0 +1,6 @@
+export enum EstadoUnidad {
+  ACTIVA = 'ACTIVA',
+  FUERA_DE_SERVICIO = 'FUERA_DE_SERVICIO',
+  MANTENIMIENTO = 'MANTENIMIENTO',
+  BAJA = 'BAJA',
+}
