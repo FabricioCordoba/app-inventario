@@ -24,7 +24,7 @@ export class UsersService {
     private readonly rolRepository: Repository<Rol>,
     @InjectRepository(UsuarioRol)
     private readonly usuarioRolRepository: Repository<UsuarioRol>,
-  ) {}
+  ) { }
 
   private baseRelations = {
     jerarquia: true,
@@ -117,6 +117,39 @@ export class UsersService {
     }
 
     return this.findOneById(savedUser.id);
+  }
+
+  async createPublic(input: {
+    nombre: string;
+    apellido: string;
+    email: string;
+    password: string;
+  }): Promise<Usuario> {
+    const defaultJerarquia = await this.jerarquiaRepository.findOne({
+      where: { activo: true },
+      order: { nivel: 'DESC' },
+    });
+
+    if (!defaultJerarquia) {
+      throw new NotFoundException('No existe una jerarquía activa disponible');
+    }
+
+    const defaultRole = await this.rolRepository.findOne({
+      where: { codigo: 'INVENTARIOS', activo: true },
+    });
+
+    if (!defaultRole) {
+      throw new NotFoundException('No existe un rol predeterminado para nuevos usuarios');
+    }
+
+    return this.create({
+      nombre: input.nombre,
+      apellido: input.apellido,
+      email: input.email,
+      password: input.password,
+      jerarquiaId: defaultJerarquia.id,
+      rolIds: [defaultRole.id],
+    });
   }
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<Usuario> {

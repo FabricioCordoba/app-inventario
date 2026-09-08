@@ -1,6 +1,7 @@
 import {
-  Injectable,
-  UnauthorizedException,
+    BadRequestException,
+    Injectable,
+    UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -8,96 +9,118 @@ import * as bcrypt from 'bcrypt';
 import { Usuario } from '../users/entities/usuario.entity';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { AuthUser, LoginResponse } from './interfaces/auth.interface';
 
 @Injectable()
 export class AuthService {
-  constructor(
-    private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-  ) {}
+    constructor(
+        private readonly usersService: UsersService,
+        private readonly jwtService: JwtService,
+        private readonly configService: ConfigService,
+    ) { }
 
-  private mapAuthUser(user: Usuario): AuthUser {
-    const roles = Array.from(
-      new Set(
-        (user.usuarioRoles ?? [])
-          .map((usuarioRol) => usuarioRol.rol?.codigo)
-          .filter((codigo): codigo is string => Boolean(codigo)),
-      ),
-    );
+    private mapAuthUser(user: Usuario): AuthUser {
+        const roles = Array.from(
+            new Set(
+                (user.usuarioRoles ?? [])
+                    .map((usuarioRol) => usuarioRol.rol?.codigo)
+                    .filter((codigo): codigo is string => Boolean(codigo)),
+            ),
+        );
 
-    const permisos = Array.from(
-      new Set(
-        (user.usuarioRoles ?? [])
-          .flatMap((usuarioRol) => usuarioRol.rol?.rolPermisos ?? [])
-          .map((rolPermiso) => rolPermiso.permiso?.codigo)
-          .filter((codigo): codigo is string => Boolean(codigo)),
-      ),
-    );
+        const permisos = Array.from(
+            new Set(
+                (user.usuarioRoles ?? [])
+                    .flatMap((usuarioRol) => usuarioRol.rol?.rolPermisos ?? [])
+                    .map((rolPermiso) => rolPermiso.permiso?.codigo)
+                    .filter((codigo): codigo is string => Boolean(codigo)),
+            ),
+        );
 
-    return {
-      id: user.id,
-      email: user.email,
-      nombre: user.nombre,
-      apellido: user.apellido,
-      jerarquia: {
-        id: user.jerarquia.id,
-        nombre: user.jerarquia.nombre,
-        nivel: user.jerarquia.nivel,
-      },
-      roles,
-      permisos,
-    };
-  }
-
-  async validateActiveUser(id: number): Promise<AuthUser | null> {
-    const user = await this.usersService.findByIdForAuth(id);
-    if (!user) {
-      return null;
+        return {
+            id: user.id,
+            email: user.email,
+            nombre: user.nombre,
+            apellido: user.apellido,
+            jerarquia: {
+                id: user.jerarquia.id,
+                nombre: user.jerarquia.nombre,
+                nivel: user.jerarquia.nivel,
+            },
+            roles,
+            permisos,
+        };
     }
 
-    return this.mapAuthUser(user);
-  }
+    async validateActiveUser(id: number): Promise<AuthUser | null> {
+        const user = await this.usersService.findByIdForAuth(id);
+        if (!user) {
+            return null;
+        }
 
-  async login(loginDto: LoginDto): Promise<LoginResponse> {
-    const user = await this.usersService.findByEmail(loginDto.email);
-
-    if (!user) {
-      throw new UnauthorizedException('Credenciales inválidas');
+        return this.mapAuthUser(user);
     }
 
-    const passwordMatches = await bcrypt.compare(
-      loginDto.password,
-      user.passwordHash,
-    );
+    async login(loginDto: LoginDto): Promise<LoginResponse> {
+        const user = await this.usersService.findByEmail(loginDto.email);
 
-    if (!passwordMatches) {
-      throw new UnauthorizedException('Credenciales inválidas');
+        if (!user) {
+            throw new UnauthorizedException('Credenciales inválidas');
+        }
+
+        const passwordMatches = await bcrypt.compare(
+            loginDto.password,
+            user.passwordHash,
+        );
+
+        if (!passwordMatches) {
+            throw new UnauthorizedException('Credenciales inválidas');
+        }
+
+        const authUser = this.mapAuthUser(user);
+        const accessToken = this.jwtService.sign({
+            sub: user.id,
+            email: user.email,
+            type: 'access',
+        });
+
+        const refreshToken = this.jwtService.sign(
+            {
+                sub: user.id,
+                email: user.email,
+                type: 'refresh',
+            },
+            {
+                expiresIn: (this.configService.get<string>('jwt.refreshExpiresIn') ?? '7d') as any,
+            },
+        );
+
+        return {
+            accessToken,
+            refreshToken,
+            user: authUser,
+        };
     }
 
-    const authUser = this.mapAuthUser(user);
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      type: 'access',
-    });
+    async register(registerDto: RegisterDto): Promise<LoginResponse> {
+        const email = registerDto.email.trim().toLowerCase();
 
-    const refreshToken = this.jwtService.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        type: 'refresh',
-      },
-      {
-        expiresIn: (this.configService.get<string>('jwt.refreshExpiresIn') ?? '7d') as any,
-      },
-    );
+        const existingUser = await this.usersService.findByEmail(email);
+        if (existingUser) {
+            throw new BadRequestException('Ya existe un usuario con ese email');
+        }
 
-    return {
-      accessToken,
-      refreshToken,
-      user: authUser,
-    };
-  }
+        const createdUser = await this.usersService.createPublic({
+            nombre: registerDto.nombre,
+            apellido: registerDto.apellido,
+            email,
+            password: registerDto.password,
+        });
+
+        return this.login({
+            email: createdUser.email,
+            password: registerDto.password,
+        });
+    }
 }

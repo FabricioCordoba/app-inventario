@@ -3,6 +3,7 @@ import { MainLayout } from '../layouts/MainLayout/MainLayout';
 import { CatalogsPage } from '../pages/Catalogs/Catalogs';
 import { HomePage } from '../pages/Home/Home';
 import { LoginPage } from '../pages/Login/Login';
+import { RegisterPage } from '../pages/Register/Register';
 import { RolesPage } from '../pages/Roles/Roles';
 import { UsersPage } from '../pages/Users/Users';
 
@@ -18,6 +19,7 @@ export function AppRouter() {
           <Route path="/roles" element={isAuthenticated ? <RolesPage /> : <Navigate to="/login" replace />} />
           <Route path="/catalogos" element={isAuthenticated ? <CatalogsPage /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+          <Route path="/registro" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
