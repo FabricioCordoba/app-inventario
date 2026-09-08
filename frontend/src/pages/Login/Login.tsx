@@ -17,8 +17,8 @@ type LoginResponse = {
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@bv-barker.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('admin@bvbarker.local');
+  const [password, setPassword] = useState('Admin123!');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
