@@ -1,3 +1,8 @@
+.page {
+  display: grid;
+  gap: 1.5rem;
+}
+
 .card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -16,6 +21,10 @@
   color: var(--color-text-muted);
 }
 
+.apiRow {
+  margin: 0;
+}
+
 .status {
   display: inline-block;
   padding: 0.25rem 0.75rem;
@@ -24,4 +33,47 @@
   color: #166534;
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+.alert {
+  margin: 0;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem;
+}
+
+.metricCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.label {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metricCard strong {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.emptyState {
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  color: var(--color-text-muted);
 }
