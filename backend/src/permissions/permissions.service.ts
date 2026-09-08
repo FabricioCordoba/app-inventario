@@ -24,38 +24,46 @@ export class PermissionsService {
 
   async assignPermissionsToRole(rolId: number, permisoIds: number[]): Promise<Rol> {
     const rol = await this.rolRepository.findOne({
-      where: { id: rolId },
+      where: { id: rolId, activo: true },
       relations: { rolPermisos: true },
     });
 
     if (!rol) {
-      throw new NotFoundException('Rol no encontrado');
+      throw new NotFoundException('Rol no encontrado o inactivo');
     }
 
     if (!Array.isArray(permisoIds)) {
       throw new BadRequestException('permisoIds debe ser un array');
     }
 
+    const uniquePermisoIds = [...new Set(permisoIds)];
+
+    if (uniquePermisoIds.length === 0) {
+      await this.rolPermisoRepository.delete({ rolId });
+      return this.rolRepository.findOneOrFail({
+        where: { id: rolId },
+        relations: { rolPermisos: { permiso: true } },
+      });
+    }
+
     const permisos = await this.permisoRepository.find({
-      where: { id: In(permisoIds), activo: true },
+      where: { id: In(uniquePermisoIds), activo: true },
     });
 
-    if (permisos.length !== new Set(permisoIds).size) {
+    if (permisos.length !== uniquePermisoIds.length) {
       throw new BadRequestException('Uno o más permisos no existen o están inactivos');
     }
 
     await this.rolPermisoRepository.delete({ rolId });
 
-    if (permisos.length > 0) {
-      await this.rolPermisoRepository.save(
-        permisos.map((permiso) =>
-          this.rolPermisoRepository.create({
-            rolId: rol.id,
-            permisoId: permiso.id,
-          }),
-        ),
-      );
-    }
+    await this.rolPermisoRepository.save(
+      permisos.map((permiso) =>
+        this.rolPermisoRepository.create({
+          rolId: rol.id,
+          permisoId: permiso.id,
+        }),
+      ),
+    );
 
     return this.rolRepository.findOneOrFail({
       where: { id: rolId },

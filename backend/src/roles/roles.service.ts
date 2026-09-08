@@ -31,8 +31,18 @@ export class RolesService {
   }
 
   async create(data: { codigo: string; nombre: string; descripcion?: string }): Promise<Rol> {
-    const codigo = data.codigo.trim();
-    const nombre = data.nombre.trim();
+    const codigo = data.codigo?.trim();
+    const nombre = data.nombre?.trim();
+
+    if (!codigo || !nombre) {
+      throw new BadRequestException('El código y el nombre del rol son obligatorios');
+    }
+
+    if (!/^[A-Z0-9_]+$/.test(codigo)) {
+      throw new BadRequestException(
+        'El código del rol solo puede contener letras mayúsculas, números y guiones bajos',
+      );
+    }
 
     const exists = await this.rolRepository.findOne({
       where: [{ codigo }, { nombre }],

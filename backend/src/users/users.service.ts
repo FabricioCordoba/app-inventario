@@ -11,6 +11,7 @@ import { Rol } from '../roles/entities/rol.entity';
 import { UsuarioRol } from '../roles/entities/usuario-rol.entity';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -90,15 +91,7 @@ export class UsersService {
       throw new NotFoundException('Jerarquía no encontrada');
     }
 
-    const roles = createUserDto.rolIds?.length
-      ? await this.rolRepository.find({
-          where: { id: In(createUserDto.rolIds), activo: true },
-        })
-      : [];
-
-    if (createUserDto.rolIds && roles.length !== createUserDto.rolIds.length) {
-      throw new BadRequestException('Uno o más roles no existen o están inactivos');
-    }
+    const roles = await this.validateRoles(createUserDto.rolIds ?? []);
 
     const passwordHash = await bcrypt.hash(createUserDto.password, 12);
     const user = this.usuarioRepository.create({
@@ -126,11 +119,105 @@ export class UsersService {
     return this.findOneById(savedUser.id);
   }
 
+  async update(id: number, updateUserDto: UpdateUserDto): Promise<Usuario> {
+    const user = await this.findOneById(id);
+
+    if (updateUserDto.nombre !== undefined) {
+      user.nombre = updateUserDto.nombre.trim();
+    }
+
+    if (updateUserDto.apellido !== undefined) {
+      user.apellido = updateUserDto.apellido.trim();
+    }
+
+    if (updateUserDto.email !== undefined) {
+      const email = updateUserDto.email.trim().toLowerCase();
+      const existing = await this.usuarioRepository.findOne({
+        where: { email },
+      });
+
+      if (existing && existing.id !== id) {
+        throw new BadRequestException('Ya existe un usuario con ese email');
+      }
+
+      user.email = email;
+    }
+
+    if (updateUserDto.jerarquiaId !== undefined) {
+      const jerarquia = await this.jerarquiaRepository.findOne({
+        where: { id: updateUserDto.jerarquiaId },
+      });
+
+      if (!jerarquia) {
+        throw new NotFoundException('Jerarquía no encontrada');
+      }
+
+      user.jerarquiaId = jerarquia.id;
+    }
+
+    if (updateUserDto.password !== undefined) {
+      user.passwordHash = await bcrypt.hash(updateUserDto.password, 12);
+    }
+
+    await this.usuarioRepository.save(user);
+
+    if (updateUserDto.rolIds !== undefined) {
+      await this.assignRoles(id, updateUserDto.rolIds);
+    }
+
+    return this.findOneById(id);
+  }
+
+  async assignRoles(userId: number, rolIds: number[]): Promise<Usuario> {
+    const user = await this.findOneById(userId);
+    const roles = await this.validateRoles(rolIds, true);
+
+    await this.usuarioRolRepository.delete({ usuarioId: user.id });
+
+    if (roles.length > 0) {
+      await this.usuarioRolRepository.save(
+        roles.map((rol) =>
+          this.usuarioRolRepository.create({
+            usuarioId: user.id,
+            rolId: rol.id,
+          }),
+        ),
+      );
+    }
+
+    return this.findOneById(user.id);
+  }
+
   async setActive(id: number, activo: boolean): Promise<Usuario> {
     const user = await this.findOneById(id);
     user.activo = activo;
     await this.usuarioRepository.save(user);
     return this.findOneById(id);
+  }
+
+  private async validateRoles(
+    rolIds: number[],
+    allowEmpty = false,
+  ): Promise<Rol[]> {
+    if (!Array.isArray(rolIds)) {
+      throw new BadRequestException('rolIds debe ser un array');
+    }
+
+    const uniqueRolIds = [...new Set(rolIds)];
+
+    if (!allowEmpty && uniqueRolIds.length === 0) {
+      return [];
+    }
+
+    const roles = await this.rolRepository.find({
+      where: { id: In(uniqueRolIds), activo: true },
+    });
+
+    if (roles.length !== uniqueRolIds.length) {
+      throw new BadRequestException('Uno o más roles no existen o están inactivos');
+    }
+
+    return roles;
   }
 
   async updateUltimoAcceso(id: number): Promise<void> {
