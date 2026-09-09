@@ -15,6 +15,7 @@ import { InventarioItem } from '../../inventory-items/entities/inventario-item.e
 import { InventarioItemInstancia } from '../../inventory-item-instances/entities/inventario-item-instancia.entity';
 import { Novedad } from '../../novelties/entities/novedad.entity';
 import { Auditoria } from '../../audit/entities/auditoria.entity';
+import { PasswordResetToken } from '../../auth/entities/password-reset-token.entity';
 
 export const entities = [
   Jerarquia,
@@ -34,4 +35,5 @@ export const entities = [
   InventarioItemInstancia,
   Novedad,
   Auditoria,
+  PasswordResetToken,
 ];

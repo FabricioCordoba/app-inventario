@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import styles from './Login.module.css';
 
 type LoginResponse = {
@@ -89,6 +89,10 @@ export function LoginPage() {
         <button className={styles.button} type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Ingresando...' : 'Ingresar'}
         </button>
+
+        <Link className={styles.link} to="/recuperar-contrasena">
+          ¿Olvidaste tu contraseña?
+        </Link>
       </form>
     </section>
   );
