@@ -73,6 +73,7 @@ export class InventoryParticipantsService {
 
         const usuario = await this.usuarioRepository.findOne({
             where: { id: usuarioId },
+            relations: { jerarquia: true },
         });
 
         if (!usuario) {
@@ -86,6 +87,37 @@ export class InventoryParticipantsService {
         }
 
         return inventario;
+    }
+
+    private async validateResponsibleHierarchy(
+        inventarioId: number,
+        responsableId: number,
+    ): Promise<void> {
+        const responsable = await this.usuarioRepository.findOne({
+            where: { id: responsableId },
+            relations: { jerarquia: true },
+        });
+
+        if (!responsable?.jerarquia) {
+            throw new BadRequestException('El responsable debe tener una jerarquía válida');
+        }
+
+        const participantes = await this.participanteRepository.find({
+            where: { inventarioId },
+            relations: { usuario: { jerarquia: true } },
+        });
+
+        const superior = participantes.find(
+            (participante) =>
+                participante.usuarioId !== responsableId &&
+                participante.usuario?.jerarquia?.nivel > responsable.jerarquia.nivel,
+        );
+
+        if (superior) {
+            throw new BadRequestException(
+                'El responsable debe tener una jerarquía igual o superior a todos los participantes',
+            );
+        }
     }
 
     async create(
@@ -115,6 +147,11 @@ export class InventoryParticipantsService {
         });
 
         if (participacion.esResponsable) {
+            await this.validateResponsibleHierarchy(
+                createDto.inventarioId,
+                createDto.usuarioId,
+            );
+
             await this.participanteRepository.update(
                 { inventarioId: createDto.inventarioId, esResponsable: true },
                 { esResponsable: false },
@@ -163,6 +200,11 @@ export class InventoryParticipantsService {
 
         if (updateDto.esResponsable !== undefined) {
             if (updateDto.esResponsable) {
+                await this.validateResponsibleHierarchy(
+                    participante.inventarioId,
+                    participante.usuarioId,
+                );
+
                 await this.participanteRepository.update(
                     { inventarioId: participante.inventarioId, esResponsable: true },
                     { esResponsable: false },
@@ -188,16 +230,33 @@ export class InventoryParticipantsService {
     async remove(id: number): Promise<{ message: string }> {
         const participante = await this.findOneById(id);
 
+        if (participante.esResponsable) {
+            const remaining = await this.participanteRepository.find({
+                where: { inventarioId: participante.inventarioId },
+                relations: { usuario: { jerarquia: true } },
+            });
+
+            if (remaining.length <= 1) {
+                throw new BadRequestException(
+                    'El inventario debe conservar al menos un participante responsable',
+                );
+            }
+        }
+
         await this.participanteRepository.delete(id);
 
         if (participante.esResponsable) {
             const remaining = await this.participanteRepository.find({
                 where: { inventarioId: participante.inventarioId },
-                order: { id: 'ASC' },
+                relations: { usuario: { jerarquia: true } },
             });
 
             if (remaining.length > 0) {
-                const nextResponsible = remaining[0];
+                const nextResponsible = [...remaining].sort(
+                    (left, right) =>
+                        (right.usuario?.jerarquia?.nivel ?? 0) -
+                        (left.usuario?.jerarquia?.nivel ?? 0),
+                )[0];
                 nextResponsible.esResponsable = true;
                 await this.participanteRepository.save(nextResponsible);
 

@@ -48,10 +48,22 @@ describe('InventoryParticipantsService', () => {
 
     it('should create a participant and set them as responsible', async () => {
         inventarioRepo.findOne.mockResolvedValue({ id: 9, estado: 'EN_PROCESO', responsableId: 2 });
-        usuarioRepo.findOne.mockResolvedValue({ id: 5, activo: true, nombre: 'María' });
+        usuarioRepo.findOne
+            .mockResolvedValueOnce({
+                id: 5,
+                activo: true,
+                nombre: 'María',
+                jerarquia: { nivel: 5 },
+            })
+            .mockResolvedValueOnce({
+                id: 5,
+                activo: true,
+                jerarquia: { nivel: 5 },
+            });
         participanteRepo.findOne.mockResolvedValue(null);
         participanteRepo.create.mockImplementation((dto) => dto);
         participanteRepo.save.mockImplementation((dto) => Promise.resolve({ id: 11, ...dto }));
+        participanteRepo.find.mockResolvedValue([]);
 
         const result = await service.create({
             inventarioId: 9,
