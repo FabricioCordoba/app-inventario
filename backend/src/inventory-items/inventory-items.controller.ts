@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
+import { UpdateInventoryItemInstanceDto } from './dto/update-inventory-item-instance.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { InventoryItemsService } from './inventory-items.service';
 
@@ -41,5 +42,15 @@ export class InventoryItemsController {
     @Body() updateDto: UpdateInventoryItemDto,
   ) {
     return this.inventoryItemsService.update(id, updateDto);
+  }
+
+  @RequirePermissions('INVENTARIOS_EDITAR')
+  @Patch(':itemId/instances/:instanceId')
+  updateInstance(
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Param('instanceId', ParseIntPipe) instanceId: number,
+    @Body() updateDto: UpdateInventoryItemInstanceDto,
+  ) {
+    return this.inventoryItemsService.updateInstance(itemId, instanceId, updateDto);
   }
 }

@@ -11,6 +11,7 @@ import { InventarioItemInstancia } from '../inventory-item-instances/entities/in
 import { UnidadMaterial } from '../unit-materials/entities/unidad-material.entity';
 import { InventarioItem } from './entities/inventario-item.entity';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
+import { UpdateInventoryItemInstanceDto } from './dto/update-inventory-item-instance.dto';
 
 @Injectable()
 export class InventoryItemsService {
@@ -197,6 +198,87 @@ export class InventoryItemsService {
 
     await this.itemRepository.save(item);
     return this.findOneById(id);
+  }
+
+  async updateInstance(
+    itemId: number,
+    instanceId: number,
+    updateDto: UpdateInventoryItemInstanceDto,
+  ): Promise<InventarioItem> {
+    const item = await this.findOneById(itemId);
+    this.ensureInventoryOpen(item.inventario);
+
+    const instance = await this.itemInstanceRepository.findOne({
+      where: { id: instanceId, inventarioItemId: itemId },
+    });
+
+    if (!instance) {
+      throw new NotFoundException('Instancia de ítem de inventario no encontrada');
+    }
+
+    if (updateDto.valorMedido !== undefined) {
+      if (item.tipoControl === TipoControl.CANTIDAD) {
+        throw new BadRequestException(
+          'Esta instancia no requiere una medición de capacidad o presión',
+        );
+      }
+
+      instance.valorMedido = updateDto.valorMedido;
+    }
+
+    if (updateDto.observacion !== undefined) {
+      instance.observacion = updateDto.observacion?.trim() || null;
+    }
+
+    instance.estado = updateDto.estado ?? instance.estado;
+
+    if (instance.estado !== EstadoMaterial.OK && !instance.observacion) {
+      throw new BadRequestException(
+        'La observación es obligatoria para el estado seleccionado',
+      );
+    }
+
+    await this.itemInstanceRepository.save(instance);
+    await this.recalculateItemState(itemId);
+
+    return this.findOneById(itemId);
+  }
+
+  private async recalculateItemState(itemId: number): Promise<void> {
+    const item = await this.itemRepository.findOne({
+      where: { id: itemId },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Ítem de inventario no encontrado');
+    }
+
+    const instances = await this.itemInstanceRepository.find({
+      where: { inventarioItemId: itemId },
+    });
+
+    if (instances.length === 0) {
+      return;
+    }
+
+    const hasMissing = instances.some(
+      (instance) => instance.estado === EstadoMaterial.FALTANTE,
+    );
+    const hasNonOk = instances.some(
+      (instance) => instance.estado !== EstadoMaterial.OK,
+    );
+
+    item.estado = hasMissing
+      ? EstadoMaterial.FALTANTE
+      : hasNonOk
+        ? EstadoMaterial.OBSERVACION
+        : EstadoMaterial.OK;
+
+    if (item.estado === EstadoMaterial.OK) {
+      item.observacion = null;
+    }
+
+    await this.itemRepository.save(item);
   }
 
   private calculateQuantityState(item: InventarioItem): EstadoMaterial | null {
