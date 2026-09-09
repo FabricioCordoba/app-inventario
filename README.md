@@ -39,6 +39,10 @@ npm install
 npm run dev
 ```
 
+### Alta de usuarios
+
+Los bomberos no se registran públicamente. El administrador crea cada usuario desde la API con el permiso `USUARIOS_CREAR`, asignando su jerarquía y sus roles.
+
 ## Stack
 
 | Capa | Tecnología |
