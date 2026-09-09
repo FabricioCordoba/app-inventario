@@ -11,6 +11,7 @@ import { Usuario } from '../users/entities/usuario.entity';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { Inventario } from './entities/inventario.entity';
+import { InventoryItemsService } from '../inventory-items/inventory-items.service';
 
 @Injectable()
 export class InventoriesService {
@@ -21,6 +22,7 @@ export class InventoriesService {
     private readonly unidadRepository: Repository<Unidad>,
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
+    private readonly inventoryItemsService: InventoryItemsService,
   ) {}
 
   async findAll(
@@ -143,6 +145,8 @@ export class InventoriesService {
         'Solo se puede cerrar un inventario que esté en proceso',
       );
     }
+
+    await this.inventoryItemsService.generateForInventory(id);
 
     inventario.estado = EstadoInventario.CERRADO;
     inventario.fechaCierre = new Date();

@@ -6,6 +6,7 @@ import { Inventario } from './entities/inventario.entity';
 import { InventoriesService } from './inventories.service';
 import { Unidad } from '../units/entities/unidad.entity';
 import { Usuario } from '../users/entities/usuario.entity';
+import { InventoryItemsService } from '../inventory-items/inventory-items.service';
 
 describe('InventoriesService', () => {
   let service: InventoriesService;
@@ -29,6 +30,7 @@ describe('InventoriesService', () => {
         { provide: getRepositoryToken(Inventario), useValue: inventarioRepo },
         { provide: getRepositoryToken(Unidad), useValue: unidadRepo },
         { provide: getRepositoryToken(Usuario), useValue: usuarioRepo },
+        { provide: InventoryItemsService, useValue: { generateForInventory: jest.fn() } },
       ],
     }).compile();
 
