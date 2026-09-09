@@ -81,7 +81,12 @@ export function CatalogsPage() {
     void loadCatalogs().catch((err: unknown) => setError(err instanceof Error ? err.message : 'No se pudieron cargar los catálogos'));
   }, []);
 
-  const submit = async (event: FormEvent<HTMLFormElement>, path: string, body: unknown, success: string) => {
+  const submit = async (
+    event: FormEvent<HTMLFormElement>,
+    path: string,
+    body: unknown,
+    success: string,
+  ): Promise<boolean> => {
     event.preventDefault();
     setError(null);
     setNotice(null);
@@ -90,10 +95,69 @@ export function CatalogsPage() {
       await request(path, { method: 'POST', body: JSON.stringify(body) });
       await loadCatalogs();
       setNotice(success);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo completar la operación');
+      return false;
     } finally {
       setBusy(false);
+    }
+  };
+
+  const submitUnit = async (event: FormEvent<HTMLFormElement>) => {
+    const created = await submit(event, '/units', { ...unitForm, anio: undefined }, 'Unidad creada correctamente');
+    if (created) {
+      setUnitForm({ numero: '', tipo: '', estado: 'ACTIVA' });
+    }
+  };
+
+  const submitSector = async (event: FormEvent<HTMLFormElement>) => {
+    const created = await submit(
+      event,
+      '/sectors',
+      { ...sectorForm, unidadId: Number(sectorForm.unidadId), orden: Number(sectorForm.orden) },
+      'Sector creado correctamente',
+    );
+    if (created) {
+      setSectorForm({ unidadId: '', nombre: '', orden: '0' });
+    }
+  };
+
+  const submitMaterial = async (event: FormEvent<HTMLFormElement>) => {
+    const created = await submit(event, '/materials', materialForm, 'Material creado correctamente');
+    if (created) {
+      setMaterialForm({
+        nombre: '',
+        tipoControl: 'CANTIDAD',
+        unidadMedida: 'UNIDADES',
+        requiereInstancias: false,
+      });
+    }
+  };
+
+  const submitConfiguration = async (event: FormEvent<HTMLFormElement>) => {
+    const created = await submit(
+      event,
+      '/unit-materials',
+      {
+        unidadId: Number(configurationForm.unidadId),
+        sectorId: Number(configurationForm.sectorId),
+        materialId: Number(configurationForm.materialId),
+        cantidadRequerida: Number(configurationForm.cantidadRequerida),
+        valorNominal: configurationForm.valorNominal ? Number(configurationForm.valorNominal) : undefined,
+        valorMinimo: configurationForm.valorMinimo ? Number(configurationForm.valorMinimo) : undefined,
+      },
+      'Material configurado para la unidad',
+    );
+    if (created) {
+      setConfigurationForm({
+        unidadId: '',
+        sectorId: '',
+        materialId: '',
+        cantidadRequerida: '0',
+        valorNominal: '',
+        valorMinimo: '',
+      });
     }
   };
 
@@ -118,7 +182,7 @@ export function CatalogsPage() {
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
       <div className={styles.forms}>
-        <form className={styles.panel} onSubmit={(event) => submit(event, '/units', { ...unitForm, anio: undefined }, 'Unidad creada correctamente')}>
+        <form className={styles.panel} onSubmit={submitUnit}>
           <h2>Nueva unidad</h2>
           <label>Numero<input value={unitForm.numero} onChange={(event) => setUnitForm({ ...unitForm, numero: event.target.value })} required /></label>
           <label>Tipo<input value={unitForm.tipo} onChange={(event) => setUnitForm({ ...unitForm, tipo: event.target.value })} placeholder="Autobomba" required /></label>
@@ -126,7 +190,7 @@ export function CatalogsPage() {
           <button disabled={busy}>Crear unidad</button>
         </form>
 
-        <form className={styles.panel} onSubmit={(event) => submit(event, '/sectors', { ...sectorForm, unidadId: Number(sectorForm.unidadId), orden: Number(sectorForm.orden) }, 'Sector creado correctamente')}>
+        <form className={styles.panel} onSubmit={submitSector}>
           <h2>Nuevo sector</h2>
           <label>Unidad<select value={sectorForm.unidadId} onChange={(event) => setSectorForm({ ...sectorForm, unidadId: event.target.value })} required><option value="">Seleccionar unidad</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.numero} - {unit.tipo}</option>)}</select></label>
           <label>Nombre<input value={sectorForm.nombre} onChange={(event) => setSectorForm({ ...sectorForm, nombre: event.target.value })} placeholder="Baulera 1" required /></label>
@@ -134,7 +198,7 @@ export function CatalogsPage() {
           <button disabled={busy || units.length === 0}>Crear sector</button>
         </form>
 
-        <form className={styles.panel} onSubmit={(event) => submit(event, '/materials', materialForm, 'Material creado correctamente')}>
+        <form className={styles.panel} onSubmit={submitMaterial}>
           <h2>Nuevo material</h2>
           <label>Nombre<input value={materialForm.nombre} onChange={(event) => setMaterialForm({ ...materialForm, nombre: event.target.value })} placeholder="Manguera 45 mm" required /></label>
           <label>Tipo de control<select value={materialForm.tipoControl} onChange={(event) => setMaterialForm({ ...materialForm, tipoControl: event.target.value })}><option value="CANTIDAD">Cantidad</option><option value="CAPACIDAD">Capacidad</option><option value="PRESION">Presion</option></select></label>
@@ -143,14 +207,7 @@ export function CatalogsPage() {
           <button disabled={busy}>Crear material</button>
         </form>
 
-        <form className={styles.panel} onSubmit={(event) => submit(event, '/unit-materials', {
-          unidadId: Number(configurationForm.unidadId),
-          sectorId: Number(configurationForm.sectorId),
-          materialId: Number(configurationForm.materialId),
-          cantidadRequerida: Number(configurationForm.cantidadRequerida),
-          valorNominal: configurationForm.valorNominal ? Number(configurationForm.valorNominal) : undefined,
-          valorMinimo: configurationForm.valorMinimo ? Number(configurationForm.valorMinimo) : undefined,
-        }, 'Material configurado para la unidad')}>
+        <form className={styles.panel} onSubmit={submitConfiguration}>
           <h2>Configurar material</h2>
           <label>Unidad<select value={configurationForm.unidadId} onChange={(event) => setConfigurationForm({ ...configurationForm, unidadId: event.target.value, sectorId: '' })} required><option value="">Seleccionar unidad</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.numero} - {unit.tipo}</option>)}</select></label>
           <label>Sector<select value={configurationForm.sectorId} onChange={(event) => setConfigurationForm({ ...configurationForm, sectorId: event.target.value })} required><option value="">Seleccionar sector</option>{visibleSectors.map((sector) => <option key={sector.id} value={sector.id}>{sector.nombre}</option>)}</select></label>
