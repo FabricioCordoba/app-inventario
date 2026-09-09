@@ -28,7 +28,7 @@ export function HomePage() {
     const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
     const token = localStorage.getItem('access_token');
 
-    fetch(`${apiUrl}/health`)
+    fetch(`${apiUrl}/api/health`)
       .then(async (response) => {
         if (!response.ok) {
           throw new Error('No se pudo conectar con la API');
@@ -43,7 +43,7 @@ export function HomePage() {
           return;
         }
 
-        const summaryResponse = await fetch(`${apiUrl}/dashboard/summary`, {
+        const summaryResponse = await fetch(`${apiUrl}/api/dashboard/summary`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

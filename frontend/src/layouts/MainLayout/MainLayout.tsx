@@ -22,6 +22,7 @@ export function MainLayout() {
             {isAuthenticated ? (
               <>
                 <Link to="/">Inicio</Link>
+                <Link to="/catalogos">Catálogos</Link>
                 <button type="button" className={styles.logoutButton} onClick={handleLogout}>
                   Cerrar sesión
                 </button>

@@ -99,6 +99,10 @@ async function runSeed(): Promise<void> {
         activo: true,
       }),
     );
+  } else if (!(await bcrypt.compare(adminPassword, admin.passwordHash))) {
+    admin.passwordHash = await bcrypt.hash(adminPassword, 12);
+    admin.activo = true;
+    await usuarioRepo.save(admin);
   }
 
   const rolAdmin = rolByCodigo.get('ADMINISTRADOR');
