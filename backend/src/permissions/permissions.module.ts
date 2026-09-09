@@ -12,4 +12,4 @@ import { RolPermiso } from './entities/rol-permiso.entity';
   providers: [PermissionsService],
   exports: [PermissionsService, TypeOrmModule],
 })
-export class PermissionsModule {}
+export class PermissionsModule { }
