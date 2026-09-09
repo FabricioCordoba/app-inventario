@@ -24,7 +24,7 @@ export class UsersService {
     private readonly rolRepository: Repository<Rol>,
     @InjectRepository(UsuarioRol)
     private readonly usuarioRolRepository: Repository<UsuarioRol>,
-  ) {}
+  ) { }
 
   private baseRelations = {
     jerarquia: true,
@@ -166,6 +166,17 @@ export class UsersService {
     }
 
     return this.findOneById(id);
+  }
+
+  async updatePassword(id: number, password: string): Promise<void> {
+    const user = await this.usuarioRepository.findOne({ where: { id } });
+
+    if (!user || !user.activo) {
+      throw new NotFoundException('Usuario no encontrado o inactivo');
+    }
+
+    user.passwordHash = await bcrypt.hash(password, 12);
+    await this.usuarioRepository.save(user);
   }
 
   async assignRoles(userId: number, rolIds: number[]): Promise<Usuario> {

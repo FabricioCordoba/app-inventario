@@ -1,6 +1,7 @@
 import {
   IsDateString,
   IsEnum,
+  IsArray,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -16,6 +17,11 @@ export class CreateInventoryDto {
   @IsInt()
   @IsNotEmpty()
   responsableId: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  participanteIds?: number[];
 
   @IsOptional()
   @IsDateString()

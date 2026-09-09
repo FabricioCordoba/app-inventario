@@ -1,13 +1,21 @@
 import {
+  BadRequestException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'crypto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { Usuario } from '../users/entities/usuario.entity';
 import { UsersService } from '../users/users.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { PasswordMailerService } from './password-mailer.service';
 import { AuthUser, LoginResponse } from './interfaces/auth.interface';
 
 @Injectable()
@@ -16,6 +24,9 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @InjectRepository(PasswordResetToken)
+    private readonly passwordResetTokenRepository: Repository<PasswordResetToken>,
+    private readonly passwordMailerService: PasswordMailerService,
   ) {}
 
   private mapAuthUser(user: Usuario): AuthUser {
@@ -58,6 +69,54 @@ export class AuthService {
     }
 
     return this.mapAuthUser(user);
+  }
+
+  async requestPasswordReset(dto: ForgotPasswordDto): Promise<void> {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      return;
+    }
+
+    await this.passwordResetTokenRepository.update(
+      { usuarioId: user.id, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
+
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    await this.passwordResetTokenRepository.save(
+      this.passwordResetTokenRepository.create({
+        usuarioId: user.id,
+        tokenHash,
+        expiresAt,
+        usedAt: null,
+      }),
+    );
+
+    await this.passwordMailerService.sendResetLink(user.email, token);
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    const tokenHash = createHash('sha256').update(dto.token).digest('hex');
+    const resetToken = await this.passwordResetTokenRepository.findOne({
+      where: {
+        tokenHash,
+        usedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
+      },
+    });
+
+    if (!resetToken) {
+      throw new BadRequestException('El enlace de recuperación no es válido o expiró');
+    }
+
+    await this.usersService.updatePassword(resetToken.usuarioId, dto.password);
+    resetToken.usedAt = new Date();
+    await this.passwordResetTokenRepository.save(resetToken);
   }
 
   async login(loginDto: LoginDto): Promise<LoginResponse> {

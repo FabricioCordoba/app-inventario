@@ -1,10 +1,11 @@
 import {
   IsBoolean,
-  IsDecimal,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 
 export class CreateUnitMaterialDto {
@@ -21,15 +22,18 @@ export class CreateUnitMaterialDto {
   sectorId: number;
 
   @IsOptional()
-  @IsDecimal({}, { message: 'cantidadRequerida debe ser un decimal' })
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'cantidadRequerida debe ser un número válido' })
+  @Min(0)
   cantidadRequerida?: number;
 
   @IsOptional()
-  @IsDecimal({}, { message: 'valorNominal debe ser un decimal' })
+  @IsNumber({ maxDecimalPlaces: 3 }, { message: 'valorNominal debe ser un número válido' })
+  @Min(0)
   valorNominal?: number;
 
   @IsOptional()
-  @IsDecimal({}, { message: 'valorMinimo debe ser un decimal' })
+  @IsNumber({ maxDecimalPlaces: 3 }, { message: 'valorMinimo debe ser un número válido' })
+  @Min(0)
   valorMinimo?: number;
 
   @IsOptional()

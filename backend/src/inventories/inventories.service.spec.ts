@@ -6,6 +6,8 @@ import { Inventario } from './entities/inventario.entity';
 import { InventoriesService } from './inventories.service';
 import { Unidad } from '../units/entities/unidad.entity';
 import { Usuario } from '../users/entities/usuario.entity';
+import { InventoryItemsService } from '../inventory-items/inventory-items.service';
+import { InventarioParticipante } from '../inventory-participants/entities/inventario-participante.entity';
 
 describe('InventoriesService', () => {
   let service: InventoriesService;
@@ -20,6 +22,11 @@ describe('InventoriesService', () => {
   };
   const usuarioRepo = {
     findOne: jest.fn(),
+    find: jest.fn(),
+  };
+  const participanteRepo = {
+    create: jest.fn((dto) => dto),
+    save: jest.fn((dto) => Promise.resolve(dto)),
   };
 
   beforeEach(async () => {
@@ -29,6 +36,8 @@ describe('InventoriesService', () => {
         { provide: getRepositoryToken(Inventario), useValue: inventarioRepo },
         { provide: getRepositoryToken(Unidad), useValue: unidadRepo },
         { provide: getRepositoryToken(Usuario), useValue: usuarioRepo },
+        { provide: getRepositoryToken(InventarioParticipante), useValue: participanteRepo },
+        { provide: InventoryItemsService, useValue: { generateForInventory: jest.fn() } },
       ],
     }).compile();
 
@@ -39,6 +48,7 @@ describe('InventoriesService', () => {
   it('should create an inventory with default in-progress status', async () => {
     unidadRepo.findOne.mockResolvedValue({ id: 1, numero: 'U-01' });
     usuarioRepo.findOne.mockResolvedValue({ id: 2, activo: true, nombre: 'Ana' });
+    usuarioRepo.find.mockResolvedValue([{ id: 2, activo: true, jerarquia: { nivel: 1 } }]);
     inventarioRepo.create.mockImplementation((dto) => dto);
     inventarioRepo.save.mockImplementation((dto) => Promise.resolve({ id: 10, ...dto }));
 
@@ -55,6 +65,7 @@ describe('InventoriesService', () => {
   it('should reject creating inventory for an inactive responsible user', async () => {
     unidadRepo.findOne.mockResolvedValue({ id: 1, numero: 'U-01' });
     usuarioRepo.findOne.mockResolvedValue({ id: 2, activo: false });
+    usuarioRepo.find.mockResolvedValue([]);
 
     await expect(
       service.create({ unidadId: 1, responsableId: 2 }),

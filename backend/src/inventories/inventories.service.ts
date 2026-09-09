@@ -8,9 +8,11 @@ import { Repository } from 'typeorm';
 import { EstadoInventario } from '../common/enums';
 import { Unidad } from '../units/entities/unidad.entity';
 import { Usuario } from '../users/entities/usuario.entity';
+import { InventarioParticipante } from '../inventory-participants/entities/inventario-participante.entity';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { Inventario } from './entities/inventario.entity';
+import { InventoryItemsService } from '../inventory-items/inventory-items.service';
 
 @Injectable()
 export class InventoriesService {
@@ -21,6 +23,9 @@ export class InventoriesService {
     private readonly unidadRepository: Repository<Unidad>,
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
+    @InjectRepository(InventarioParticipante)
+    private readonly participanteRepository: Repository<InventarioParticipante>,
+    private readonly inventoryItemsService: InventoryItemsService,
   ) {}
 
   async findAll(
@@ -76,10 +81,50 @@ export class InventoriesService {
     }
   }
 
+  private async validateParticipants(
+    responsableId: number,
+    participanteIds: number[] = [],
+  ): Promise<number[]> {
+    const uniqueIds = [...new Set([responsableId, ...participanteIds])];
+    const participants = await this.usuarioRepository.find({
+      where: uniqueIds.map((id) => ({ id })),
+      relations: { jerarquia: true },
+    });
+
+    if (participants.length !== uniqueIds.length) {
+      throw new BadRequestException('Todos los participantes deben existir');
+    }
+
+    const inactiveParticipant = participants.find((participant) => !participant.activo);
+    if (inactiveParticipant) {
+      throw new BadRequestException('Todos los participantes deben estar activos');
+    }
+
+    const responsible = participants.find((participant) => participant.id === responsableId);
+    if (!responsible?.jerarquia) {
+      throw new BadRequestException('El responsable debe tener una jerarquía válida');
+    }
+
+    const superiorParticipant = participants.find(
+      (participant) => participant.jerarquia.nivel > responsible.jerarquia.nivel,
+    );
+    if (superiorParticipant) {
+      throw new BadRequestException(
+        'El responsable debe tener una jerarquía igual o superior a todos los participantes',
+      );
+    }
+
+    return uniqueIds;
+  }
+
   async create(createDto: CreateInventoryDto): Promise<Inventario> {
     await this.validateUnidadAndResponsible(
       createDto.unidadId,
       createDto.responsableId,
+    );
+    const participantIds = await this.validateParticipants(
+      createDto.responsableId,
+      createDto.participanteIds,
     );
 
     const inventario = this.inventarioRepository.create({
@@ -91,7 +136,18 @@ export class InventoriesService {
       estado: createDto.estado ?? EstadoInventario.EN_PROCESO,
     });
 
-    return this.inventarioRepository.save(inventario);
+    const savedInventory = await this.inventarioRepository.save(inventario);
+    await this.participanteRepository.save(
+      participantIds.map((usuarioId) =>
+        this.participanteRepository.create({
+          inventarioId: savedInventory.id,
+          usuarioId,
+          esResponsable: usuarioId === createDto.responsableId,
+        }),
+      ),
+    );
+
+    return savedInventory;
   }
 
   async update(id: number, updateDto: UpdateInventoryDto): Promise<Inventario> {
@@ -143,6 +199,8 @@ export class InventoriesService {
         'Solo se puede cerrar un inventario que esté en proceso',
       );
     }
+
+    await this.inventoryItemsService.generateForInventory(id);
 
     inventario.estado = EstadoInventario.CERRADO;
     inventario.fechaCierre = new Date();

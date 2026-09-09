@@ -21,6 +21,27 @@
   font-weight: 700;
 }
 
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav a,
+.logoutButton {
+  color: #fff;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.logoutButton {
+  padding: 0;
+}
+
 .main {
   padding: 2rem 0 3rem;
 }
